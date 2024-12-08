@@ -1,0 +1,119 @@
+scalar LocalDateTime
+
+type Query {
+    posts: [Post]
+    post(id: ID!): Post
+    postsByAuthor(authorId: ID!): [Post]
+    feed(first: Int, after: String): PostConnection
+}
+
+type Post {
+    id: ID!
+    content: String!
+    createdAt: LocalDateTime!
+    author: User
+    comments: [Comment]
+    reactions: [Reaction]
+    tags: [Tag]
+    draft: Boolean!
+    visibility: Visibility!
+    commentCount: Int!
+    reactionCount: Int!
+}
+
+type Comment {
+    id: ID!
+    content: String!
+    createdAt: LocalDateTime!
+    author: User
+    reactions: [Reaction]
+}
+
+type User {
+    id: ID!
+    username: String!
+    profile: Profile
+    following: [User]
+    followers: [User]
+}
+
+type Profile {
+    displayName: String!
+    bio: String
+    avatar: Media
+    joinedAt: LocalDateTime!
+}
+
+type Tag {
+    id: ID!
+    name: String!
+    usageCount: Int!
+}
+
+type Reaction {
+    id: ID!
+    type: ReactionType!
+    user: User!
+    createdAt: LocalDateTime!
+}
+
+type Media {
+    id: ID!
+    url: String!
+    type: MediaType!
+    size: Int!
+    contentType: String!
+}
+
+type PostConnection {
+    edges: [PostEdge!]!
+    pageInfo: PageInfo!
+}
+
+type PostEdge {
+    node: Post!
+    cursor: String!
+}
+
+type PageInfo {
+    hasNextPage: Boolean!
+    endCursor: String
+}
+
+input CreatePostInput {
+    content: String!
+    draft: Boolean = false
+    visibility: Visibility = PUBLIC
+    tagIds: [ID!]
+}
+
+input UpdatePostInput {
+    content: String
+    draft: Boolean
+    visibility: Visibility
+    tagIds: [ID!]
+}
+
+input AddCommentInput {
+    content: String!
+}
+
+enum Visibility {
+    PUBLIC
+    PRIVATE
+    FOLLOWERS_ONLY
+}
+
+enum ReactionType {
+    LIKE
+    LOVE
+    LAUGH
+    SAD
+    ANGRY
+}
+
+enum MediaType {
+    IMAGE
+    VIDEO
+    DOCUMENT
+}

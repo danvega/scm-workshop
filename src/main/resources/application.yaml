@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: scm-workshop
+  sql:
+    init:
+      mode: always
+  graphql:
+    graphiql:
+      enabled: true
+logging:
+  level:
+    org:
+      springframework:
+        web: DEBUG

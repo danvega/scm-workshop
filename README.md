@@ -901,6 +901,17 @@ record PostSearchProperties(
 ) {}
 ```
 
+Creating a configuration properties class provides several key benefits beyond just IDE intellisense:
+
+* Type Safety: Validates configuration at startup, catching misconfigurations early
+* Strong Typing: Converting string values to proper types (Integer, Boolean, etc.) automatically
+* Default Values: Built-in support for fallback values using @DefaultValue
+* Documentation: IDE tooltips and completion for available properties, making configuration more discoverable
+* Validation: Can add validation annotations (@Min, @Max, etc.) to enforce constraints
+* Modular Config: Groups related properties together logically vs scattered @Value annotations
+* Testing: Easier to create test configurations with builder patterns
+* Refactoring: IDE support for renaming properties across codebase
+
 #### 3. Use Configuration in Code
 
 ```java
@@ -1166,10 +1177,7 @@ Add to your pom.xml:
 ```
 
 ```shell
-# Development build
-./mvnw native:compile
-
-# Optimized build
+# build
 ./mvnw -Pnative native:compile -DskipTests
 
 # Cloud Native Buildpacks
@@ -1189,6 +1197,18 @@ public class MyRuntimeHints implements RuntimeHintsRegistrar {
 }
 ```
 
+You can run the native image from the target directory:
+
+```shell
+# Run the native image 
+./target/scm-workshop
+
+# Run the native image with a profile
+./target/scm-workshop -Dspring.profiles.active=prod 
+```
+
+[Native Iamge Documentaiton](https://docs.spring.io/spring-boot/reference/packaging/native-image/index.html)
+
 ## Testing
 
 ### Overusing @SpringBootTest
@@ -1204,16 +1224,61 @@ When Not to Use @SpringBootTest
 
 * Unit Tests: For testing a single class, @SpringBootTest is overkill. Use mocks to isolate dependencies.
 * Layer-Specific Tests: Use slice annotations to test specific layers:
-    * @WebMvcTest: For controller tests.
-    * @DataJpaTest: For repository tests.
-    * @MockBean: For injecting mocks in slice tests.
 * Performance Considerations: @SpringBootTest can slow down tests. Slice tests are faster and more focused.
 
-Best Practice
+#### Available Slice Test Annotations
 
-* Use unit tests for isolated logic.
-* Use slice tests for layer-specific testing.
-* Use @SpringBootTest for integration tests only.
+**Controller Layer: **
+* `@WebMvcTest`: For testing MVC controllers without starting the full web server
+    - Loads only web-related components (controllers, filters, etc.)
+    - Useful for testing endpoint behavior and request/response handling
+
+**Data Layer:**
+* `@DataJpaTest`: For testing JPA repositories
+    - Configures in-memory database
+    - Loads JPA-related components only
+
+* `@DataMongoTest`: For testing MongoDB repositories
+    - Configures in-memory MongoDB
+    - Perfect for testing MongoDB-specific operations and queries
+
+* `@JdbcTest`: For testing JDBC operations
+    - Sets up a basic JDBC environment
+    - Useful when working directly with JdbcTemplate
+
+**JSON Processing:**
+* `@JsonTest`: For testing JSON serialization/deserialization
+    - Loads JSON mapping infrastructure
+    - Ideal for testing DTOs and JSON conversions
+
+**Reactive Applications:**
+* `@WebFluxTest`: For testing WebFlux controllers
+    - Loads reactive web components
+    - Perfect for testing reactive endpoints and flows
+
+**External Services:** 
+* `@RestClientTest`: For testing REST clients
+    - Configures a mock web server
+    - Useful for testing external API integrations without making real HTTP calls
+
+**Custom Slices:**
+
+You can create custom slice tests by combining annotations to test specific layers or components:
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@DataJpaTest
+@AutoConfigureTestDatabase
+@ComponentScan(basePackages = "com.example.service")
+public @interface ServiceTest {}
+```
+
+**Best Practices**
+
+1. Choose the most specific slice test for your needs
+2. Mock dependencies in slice tests
+3. Keep tests focused on a single layer or responsibility
+4. Consider test execution time when choosing between full context and slice tests
 
 By using slice tests strategically, you can create faster, more maintainable test suites without the performance hit.
 
@@ -1230,11 +1295,19 @@ class PostControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @Autowired
     private PostRepository repository;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @TestConfiguration
+    static class TestConfig {
+        @Bean
+        public PostRepository postRepository() {
+            return mock(PostRepository.class);
+        }
+    }
 
     @Test
     void findAll_ShouldReturnPosts() throws Exception {
@@ -1250,64 +1323,8 @@ class PostControllerTest {
                 .andExpect(jsonPath("$[1].content").value("Content 2"));
     }
 
-    @Test
-    void findById_ShouldReturnPost_WhenPostExists() throws Exception {
-        Post post = new Post(1L, "Content 1", LocalDateTime.now(), List.of(), List.of(), List.of(), new User(1L, "Author 1", "author1@example.com", "hashedPassword1", null, List.of(), List.of(), Role.USER), List.of(), false, Visibility.PUBLIC);
+    // More tests...
 
-        given(repository.findById(1L)).willReturn(Optional.of(post));
-
-        mockMvc.perform(get("/api/posts/1"))
-                .andExpect(status().isOk())
-                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$.content").value("Content 1"));
-    }
-
-    @Test
-    public void findById_ShouldThrowNotFoundException_WhenPostDoesNotExist() {
-        given(repository.findById(99L)).willThrow(new PostNotFoundException(99L));
-
-        Assertions.assertThrows(PostNotFoundException.class, () -> {
-            repository.findById(99L);
-        });
-    }
-
-    @Test
-    void create_ShouldCreatePost() throws Exception {
-        Post post = new Post(null, "New Content", LocalDateTime.now(), List.of(), List.of(), List.of(), new User(1L, "Author 1", "author1@example.com", "hashedPassword1", null, List.of(), List.of(), Role.USER), List.of(), false, Visibility.PUBLIC);
-        Post savedPost = new Post(1L, "New Content", LocalDateTime.now(), List.of(), List.of(), List.of(), new User(1L, "Author 1", "author1@example.com", "hashedPassword1", null, List.of(), List.of(), Role.USER), List.of(), false, Visibility.PUBLIC);
-
-        given(repository.save(post)).willReturn(savedPost);
-
-        mockMvc.perform(post("/api/posts")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(post)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(1L))
-                .andExpect(jsonPath("$.content").value("New Content"));
-    }
-
-    @Test
-    void update_ShouldUpdatePost_WhenPostExists() throws Exception {
-        Post post = new Post(1L, "Updated Content", LocalDateTime.now(), List.of(), List.of(), List.of(), new User(1L, "Author 1", "author1@example.com", "hashedPassword1", null, List.of(), List.of(), Role.USER), List.of(), false, Visibility.PUBLIC);
-
-        given(repository.findById(1L)).willReturn(Optional.of(post));
-        given(repository.save(post)).willReturn(post);
-
-        mockMvc.perform(put("/api/posts/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(post)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content").value("Updated Content"));
-    }
-
-    @Test
-    void delete_ShouldDeletePost_WhenPostExists() throws Exception {
-        doNothing().when(repository).deleteById(1L);
-
-        mockMvc.perform(delete("/api/posts/1"))
-                .andExpect(status().isNoContent());
-    }
-    
 }
 ```
 
@@ -1388,7 +1405,11 @@ With this configuration, Spring Security takes care of validating the JWT, manag
 
 By using OAuth2 Resource Server support, you can trust that your application is following industry standards for JWT validation, without the need for custom, error-prone code.
 
+[Spring Security JWT Blog Post](https://www.danvega.dev/blog/spring-security-jwt)
+
 ## Resources
+
+[This Repository](https://github.com/danvega/scm-workshop)
 
 ### Spring
 - [Spring](https://spring.io)
@@ -1416,3 +1437,29 @@ By using OAuth2 Resource Server support, you can trust that your application is 
 - [GitHub](https://github.com/danvega/)
 
 ## Notes
+
+- Docker Desktop needs to be running
+- Browswer Tabs
+  - [This Repository](https://github.com/danvega/scm-workshop)
+  - [Spring Initializr](https://start.spring.io/)
+    - Spring Init Features 🤩
+- Branches
+  - main
+    - Should contain the final code
+  - start-here
+    - Should contain all the dependencies needed for the entire workshop
+  - data-start-here
+    - Should contain all the models needed
+    - Should contain PostService and CommentService for Transaction Management Demo
+    - Add during workshop
+      - properties to applicaiton.yaml
+      - data.sql and schema.sql
+      - simple repository 
+      - full repository
+  - web-apis
+    - Live Template for the PostController and PostGraphQLController
+    - GraphQL - Schema / Properties 
+  - performance
+    - Virtual Threads - enable
+    - Native Images - Add MyRuntimeHints
+      - How does this work, show documentation

@@ -1445,17 +1445,7 @@ By using OAuth2 Resource Server support, you can trust that your application is 
     - Spring Init Features 🤩
 - Branches
   - main
-    - Should contain the final code
   - start-here
-    - Should contain all the dependencies needed for the entire workshop
-  - data-start-here
-    - Should contain all the models needed
-    - Should contain PostService and CommentService for Transaction Management Demo
-    - Add during workshop
-      - properties to applicaiton.yaml
-      - data.sql and schema.sql
-      - simple repository 
-      - full repository
-  - web-apis
-    - Live Template for the PostController and PostGraphQLController
-    - GraphQL - Schema / Properties 
+  - data-access-here
+  - web-apis-start
+  - performance-start

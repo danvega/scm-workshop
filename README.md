@@ -1459,7 +1459,3 @@ By using OAuth2 Resource Server support, you can trust that your application is 
   - web-apis
     - Live Template for the PostController and PostGraphQLController
     - GraphQL - Schema / Properties 
-  - performance
-    - Virtual Threads - enable
-    - Native Images - Add MyRuntimeHints
-      - How does this work, show documentation

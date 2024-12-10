@@ -23,11 +23,11 @@ class PostRepositoryTemplate {
                 rs.getLong("id"),
                 rs.getString("content"),
                 rs.getTimestamp("created_at").toLocalDateTime(),
-                Collections.emptyList(), // attachments
-                Collections.emptyList(), // comments
-                Collections.emptyList(), // reactions
-                null, // author - would need separate query
-                Collections.emptyList(), // tags
+                Collections.emptyList(),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                null,
+                Collections.emptyList(),
                 rs.getBoolean("draft"),
                 Visibility.valueOf(rs.getString("visibility"))
         );
